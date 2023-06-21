@@ -2,7 +2,7 @@ import random
 
 import speech_recognition as sr
 from playsound import playsound, PlaysoundException
-from speech_recognition import UnknownValueError
+from speech_recognition import UnknownValueError, WaitTimeoutError
 
 
 class HintMatcher():
@@ -14,11 +14,10 @@ class HintMatcher():
 
     def match(self, data):
         for hint in self.hints:
-            for phrase in hint.keywords:
-                if phrase.lower() in data.lower():
-                    return hint.hint_path
+            if hint.keywords.lower() in data.lower():
+                return hint.hint_path
 
-            return self.incorrect_request
+        return self.incorrect_request
 
         return self.no_hint
 
@@ -30,7 +29,7 @@ class Hint():
 
 
 def play_hint(filename):
-    playsound("Renders/{}".format(filename))
+    playsound(filename)
 
 
 def call_microphone():
@@ -41,20 +40,23 @@ def call_microphone():
         # wait 1 second before providing sound input
         print("Wait, dont say anything microphone is adjusting noise levels ")
         recognizer.adjust_for_ambient_noise(source)
-        print("Now say what you need, i.e 'give me a hint'  ")
+        print("now say")
+        # print("Now say what you need, i.e 'give me a hint'  ")
         audio = recognizer.listen(source, timeout=3, phrase_time_limit=6)
 
-    return recognizer.recognize_google(audio, language="pl-PL")
+    return recognizer.recognize_google(audio)
 
 
 def activator():
+    print("dziala")
     while True:
         try:
             siri = call_microphone()
-            if "hello siri" in siri:
+            if "hello" in siri:
+                print(siri, "chuj")
                 return True
-        except (UnknownValueError or PlaysoundException) as e:
-            continue
+        except (UnknownValueError, PlaysoundException, TimeoutError) as e:
+            pass
 
 
 testdata = [{'tip_body': 'date', 'tip_call': '04_hint_forensics'}, {'tip_body': 'lock', 'tip_call': '05_hint_date'}]
@@ -64,23 +66,32 @@ def parser(data):
     tips = []
 
     for tip in data:
+        print(tip)
         test = tip["tip_body"].replace(" ", "_")
         tips.append(Hint(tip["tip_call"], test + ".wav"))
 
+    return tips
+
 
 def game(data_json):
-    matcher = HintMatcher(parser(testdata))
+    matcher = HintMatcher(parser(data_json))
     while True:
-        if activator():
+        activator()
+        print("Activiated, now after signal say hint")
+
+        while True:
             try:
+                print("Activiated, now after signal say hint")
+
+                hint_path = ""
                 text = call_microphone()
-            except (UnknownValueError or PlaysoundException) as e:
+                print(text)
+
+                hint_path = matcher.match(text)
+                play_hint("Renders/" + hint_path)
+            except (UnknownValueError, PlaysoundException, WaitTimeoutError) as e:
                 print("Couldn't recognize what you said")
                 play_hint("Renders/02_speak_more_clearly.wav")
                 continue
 
-            hint_path = matcher.match(text)
-            play_hint(hint_path)
 
-
-game()
